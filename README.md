@@ -11,6 +11,9 @@ skills/
   maintainer-review/
     SKILL.md
     agents/openai.yaml
+  implementation-plan-review/
+    SKILL.md
+    agents/openai.yaml
 ```
 
 ## Install With `npx skills`
@@ -39,6 +42,12 @@ Install the `maintainer-review` skill globally:
 
 ```bash
 npx skills add <owner>/maintainer-skills --skill maintainer-review -g -y
+```
+
+Install the `implementation-plan-review` skill globally:
+
+```bash
+npx skills add <owner>/maintainer-skills --skill implementation-plan-review -g -y
 ```
 
 Install every skill in the repository globally:

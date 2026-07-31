@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implementation Plan Review"
+  short_description: "Review implementation plans with maintainer judgment"
+  default_prompt: "Use $implementation-plan-review to evaluate this implementation plan against the repository architecture and identify the smallest low-risk path."
