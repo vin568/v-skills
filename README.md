@@ -4,13 +4,13 @@ Collection repository for Codex maintainer workflow skills.
 
 ## Layout
 
-Each skill lives in a top-level `<skill-name>/` directory and remains independently installable.
-This layout is intentionally shallow so `npx skills add <repo> --list` can discover skills without extra flags.
+Each skill lives under `skills/<skill-name>/` and remains independently installable.
 
 ```text
-code-review/
-  SKILL.md
-  agents/openai.yaml
+skills/
+  code-review/
+    SKILL.md
+    agents/openai.yaml
 ```
 
 ## Install With `npx skills`
@@ -27,6 +27,12 @@ List available skills from a local checkout:
 
 ```bash
 npx skills add /path/to/maintainer-skills --list
+```
+
+If a local checkout unexpectedly reports no skills, confirm the exact skill path:
+
+```bash
+npx skills add /path/to/maintainer-skills/skills/code-review --list
 ```
 
 Install the `code-review` skill globally:
