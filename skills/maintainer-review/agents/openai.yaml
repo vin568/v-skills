@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintainer Review"
+  short_description: "Review changes with maintainer judgment"
+  default_prompt: "Use $maintainer-review to review the latest commit."

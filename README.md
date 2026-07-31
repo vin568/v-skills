@@ -8,7 +8,7 @@ Each skill lives under `skills/<skill-name>/` and remains independently installa
 
 ```text
 skills/
-  code-review/
+  maintainer-review/
     SKILL.md
     agents/openai.yaml
 ```
@@ -32,13 +32,13 @@ npx skills add /path/to/maintainer-skills --list
 If a local checkout unexpectedly reports no skills, confirm the exact skill path:
 
 ```bash
-npx skills add /path/to/maintainer-skills/skills/code-review --list
+npx skills add /path/to/maintainer-skills/skills/maintainer-review --list
 ```
 
-Install the `code-review` skill globally:
+Install the `maintainer-review` skill globally:
 
 ```bash
-npx skills add <owner>/maintainer-skills --skill code-review -g -y
+npx skills add <owner>/maintainer-skills --skill maintainer-review -g -y
 ```
 
 Install every skill in the repository globally:

@@ -1,9 +1,9 @@
 ---
-name: code-review
-description: Review code changes like a senior maintainer. Use when the user asks Codex to review a commit, diff, PR, branch, staged changes, working tree changes, or a specified git range, especially when the review should infer the minimal external behavior goal from the diff and check architecture fit, mechanism reuse, and change scope before judging implementation details.
+name: maintainer-review
+description: Review code changes with a senior maintainer lens. Use when the user asks Codex to review a commit, diff, PR, branch, staged changes, working tree changes, or a specified git range, especially when the review should infer the minimal external behavior goal from the diff and check architecture fit, mechanism reuse, and change scope before judging implementation details.
 ---
 
-# Code Review
+# Maintainer Review
 
 Review code changes only. Do not modify files, do not commit, and do not rewrite the implementation unless the user explicitly asks for fixes after the review.
 
