@@ -13,12 +13,26 @@ skills/
     agents/openai.yaml
 ```
 
-## Install
+## Install With `npx skills`
 
-Install a skill from this repository by pointing the installer at its skill path:
+The Skills CLI requires Node.js `>=22.20.0`.
+
+List available skills after this repository is pushed to GitHub:
 
 ```bash
-install-skill-from-github.py --repo <owner>/<repo> --path skills/code-review
+npx skills add <owner>/maintainer-skills --list
 ```
 
-Multiple skills can be installed from the same repository by passing multiple `--path` values.
+Install the `code-review` skill globally:
+
+```bash
+npx skills add <owner>/maintainer-skills --skill code-review -g -y
+```
+
+Install every skill in the repository globally:
+
+```bash
+npx skills add <owner>/maintainer-skills --all -g
+```
+
+Replace `<owner>` with the GitHub account or organization that owns the repository.
