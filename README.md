@@ -1,6 +1,6 @@
-# Codex Skills
+# Maintainer Skills
 
-Collection repository for Codex skills.
+Collection repository for Codex maintainer workflow skills.
 
 ## Layout
 
