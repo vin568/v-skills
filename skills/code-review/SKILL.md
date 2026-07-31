@@ -99,7 +99,6 @@ Use the user's language. Return these sections:
 2. `需要确认的假设`
 3. `结论：通过 / 有条件通过 / 需要修改 / 不建议合并`
 4. `主要问题，按严重程度排序`
-5. `建议的最小修正范围`
 
 For each issue include:
 
