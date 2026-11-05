@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Fit Review"
+  short_description: "Review architecture fit, scope, and change risk"
+  default_prompt: "Use $architecture-fit-review to review the latest commit."

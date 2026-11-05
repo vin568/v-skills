@@ -1,6 +1,6 @@
-# Maintainer Skills
+# V Skills
 
-Collection repository for Codex maintainer workflow skills.
+Collection repository for agent workflow skills.
 
 ## Layout
 
@@ -8,11 +8,12 @@ Each skill lives under `skills/<skill-name>/` and remains independently installa
 
 ```text
 skills/
-  maintainer-review/
+  architecture-fit-review/
     SKILL.md
     agents/openai.yaml
-  implementation-plan-review/
+  test-review/
     SKILL.md
+    anti-patterns.md
     agents/openai.yaml
 ```
 
@@ -20,40 +21,38 @@ skills/
 
 The Skills CLI requires Node.js `>=22.20.0`.
 
-List available skills after this repository is pushed to GitHub:
+List available skills from GitHub:
 
 ```bash
-npx skills add <owner>/maintainer-skills --list
+npx skills add vin568/v-skills --list
 ```
 
 List available skills from a local checkout:
 
 ```bash
-npx skills add /path/to/maintainer-skills --list
+npx skills add /path/to/v-skills --list
 ```
 
 If a local checkout unexpectedly reports no skills, confirm the exact skill path:
 
 ```bash
-npx skills add /path/to/maintainer-skills/skills/maintainer-review --list
+npx skills add /path/to/v-skills/skills/architecture-fit-review --list
 ```
 
-Install the `maintainer-review` skill globally:
+Install the `architecture-fit-review` skill globally:
 
 ```bash
-npx skills add <owner>/maintainer-skills --skill maintainer-review -g -y
+npx skills add vin568/v-skills --skill architecture-fit-review -g -y
 ```
 
-Install the `implementation-plan-review` skill globally:
+Install the `test-review` skill globally:
 
 ```bash
-npx skills add <owner>/maintainer-skills --skill implementation-plan-review -g -y
+npx skills add vin568/v-skills --skill test-review -g -y
 ```
 
 Install every skill in the repository globally:
 
 ```bash
-npx skills add <owner>/maintainer-skills --all -g
+npx skills add vin568/v-skills --all -g
 ```
-
-Replace `<owner>` with the GitHub account or organization that owns the repository.

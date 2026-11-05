@@ -1,9 +1,9 @@
 ---
-name: maintainer-review
-description: Review code changes with a senior maintainer lens. Use when the user asks Codex to review a commit, diff, PR, branch, staged changes, working tree changes, or a specified git range, especially when the review should infer the minimal external behavior goal from the diff and check architecture fit, mechanism reuse, and change scope before judging implementation details.
+name: architecture-fit-review
+description: Review code changes for architecture fit, change scope, and risk. Use when the user asks to review a commit, diff, PR, branch, staged changes, working tree changes, or a specified git range, especially when the review should verify the stated requirement against existing architecture or, only when no requirement is available, infer the smallest plausible external behavior goal.
 ---
 
-# Maintainer Review
+# Architecture Fit Review
 
 Review code changes only. Do not modify files, do not commit, and do not rewrite the implementation unless the user explicitly asks for fixes after the review.
 
@@ -42,7 +42,11 @@ If the current directory is not a git repository or the requested range cannot b
 
 ## Review Workflow
 
-First infer the smallest plausible external behavior goal from the diff and nearby context. Do not treat every implementation choice in the diff as a requirement.
+Establish the requirement before judging the implementation:
+
+- If the user, issue, PR description, acceptance criteria, design document, or other authoritative context states the requirement, use that requirement directly. Do not replace it with a narrower inferred requirement merely because a smaller change is possible.
+- Distinguish required external behavior from implementation choices contained in the proposal or diff.
+- Infer the smallest plausible external behavior goal from the diff and nearby context only when the requirement is genuinely unavailable. Label the result as inferred and list material uncertainty under assumptions that need confirmation.
 
 Before forming conclusions, inspect relevant context beyond the diff:
 
@@ -55,7 +59,7 @@ Before forming conclusions, inspect relevant context beyond the diff:
 
 Use fast local search first, especially `rg` and `rg --files`.
 
-Review with a maintainer bias toward existing architecture. Prefer existing mechanisms unless the inferred requirement truly needs a new path, abstraction, configuration surface, or behavior boundary.
+Review with a conservative bias toward minimizing unnecessary architectural disruption, not toward preserving the current architecture unconditionally. Prefer existing mechanisms when they satisfy the stated or inferred requirement. Accept a new path, abstraction, configuration surface, or behavior boundary when evidence shows the existing mechanism is insufficient or itself creates greater risk.
 
 Run focused tests when they are cheap, relevant, and available. If tests are not run, state that briefly in the final review only when it affects confidence.
 
@@ -65,13 +69,13 @@ Focus on concrete risks, not style preferences.
 
 Check:
 
-- Does the change satisfy the inferred minimal external behavior goal?
-- Is there a smaller change that would satisfy that goal?
-- Does it reuse existing mechanisms, helpers, configuration, and call paths?
-- Does it bypass established boundaries or duplicate an existing abstraction?
+- Does the change satisfy the stated requirement, or the explicitly inferred goal when no stated requirement exists?
+- Is the change scope necessary for that requirement? Could a smaller semantic or architectural change satisfy it without creating greater long-term risk?
+- Does it appropriately reuse existing mechanisms, helpers, configuration, and call paths?
+- Does it bypass established boundaries or duplicate an existing abstraction without sufficient reason?
 - Does it introduce compatibility, migration, concurrency, security, data integrity, or lifecycle risks?
 - Are tests missing where behavior could regress?
-- Are assumptions hidden in the implementation that should be confirmed with the user?
+- Are assumptions hidden in the requirement or implementation that should be confirmed with the user?
 
 If a new mechanism appears justified, explain:
 
@@ -95,7 +99,7 @@ Do not include generic style comments. If there are no blocking issues, say that
 
 Use the user's language. Return these sections:
 
-1. `反推的最小需求`
+1. `需求依据` — quote or summarize the stated requirement; if none exists, use `反推的最小需求` and mark it as inferred
 2. `需要确认的假设`
 3. `结论：通过 / 有条件通过 / 需要修改 / 不建议合并`
 4. `主要问题，按严重程度排序`
