@@ -1,0 +1,4 @@
+interface:
+  display_name: "Autopilot Grilling"
+  short_description: "Settle a design with minimal user interruptions"
+  default_prompt: "Use $autopilot-grilling to settle the open decisions in this plan."

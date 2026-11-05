@@ -51,6 +51,12 @@ Install the `test-review` skill globally:
 npx skills add vin568/v-skills --skill test-review -g -y
 ```
 
+Install the `autopilot-grilling` skill globally:
+
+```bash
+npx skills add vin568/v-skills --skill autopilot-grilling -g -y
+```
+
 Install every skill in the repository globally:
 
 ```bash
