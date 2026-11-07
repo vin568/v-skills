@@ -17,6 +17,10 @@ skills/
     agents/openai.yaml
 ```
 
+## Development Notes
+
+- [`docs/review-loop-convergence.md`](docs/review-loop-convergence.md) — evidence-based analysis of why multi-round review/audit loops fail to converge, and the design rules review skills in this repo should follow (declared stopping condition, frozen cross-round checklist, round budget, defect-vs-opinion split, escalation of near-ties, oracle-backed high-severity claims).
+
 ## Install With `npx skills`
 
 The Skills CLI requires Node.js `>=22.20.0`.

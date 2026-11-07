@@ -1,15 +1,24 @@
 ---
 name: test-review
-description: "Evaluate and audit test suites to eliminate false sense of security (虚假的安全感) and improve fault-detection quality. Use when the user asks to evaluate tests, review test cases, check if tests are meaningful/necessary/high-quality, audit unit/integration/e2e coverage for a feature or diff, or prune low-value tests."
+description: "Evaluate and audit test suites to eliminate false sense of security (虚假的安全感) and improve fault-detection quality. Use when the user asks to evaluate tests, review test cases, check if tests are meaningful/necessary/high-quality, audit unit/integration/e2e coverage for a feature or diff, or prune low-value tests. Multi-round reviews converge against a frozen checklist stored in a persistent ledger instead of re-auditing from scratch each round."
 ---
 
-# Test Quality Review & Audit
+# Test Quality Review & Audit (Convergent)
 
 Green tests do not mean working software. A large suite of low-quality tests creates a **false sense of security (虚假的安全感)**: CI stays green while real bugs slip into production, and harmless refactors break dozens of brittle assertions.
 
 This skill evaluates test suites against **five orthogonal industry dimensions** (synthesizing Vladimir Khorikov's *Four Pillars of Unit Testing*, *Mutation Testing* fault-detection theory, Kent Beck's *Test Desiderata*, and *Contract/Test-Double Fidelity*).
 
 Read [anti-patterns.md](anti-patterns.md) only when you need concrete before/after rewrite templates for findings.
+
+## Convergence Principles (why this skill is multi-round safe)
+
+Empirical background and citations: `docs/review-loop-convergence.md` in the v-skills repository.
+
+1. **Converge against a declared checklist, never against "no more issues exist."** No computable criterion can guarantee absence of faults (Goodenough & Gerhart 1975 program; Howden 1976). "Converged" means: no new P0/P1 against the frozen checklist — it never means nothing more can be found.
+2. **Two streams, one gate.** Defect-stream findings (P0/P1: missed real bugs, mock divergence, phantom E2E, missed state transitions) gate convergence. Opinion-stream findings (P3: implementation coupling, duplicate/merge/delete suggestions) are recorded but **never** block convergence — the stream of reportable non-defect issues never dries up even after the true-defect stream has (Porter et al., TOSEM 1998: only ~18% of raised issues were true defects).
+3. **Rounds are budgeted.** Default: 2 deep review rounds + 1 verification round. When the budget is spent, remaining open items are declared `⚠️ 待人工复核` and the review stops. Budget exhaustion is a legitimate, stakeholder-visible exit (ISTQB exit criteria).
+4. **Freeze the anchor.** The invariant checklist and finding IDs are derived once, stored in a ledger, and frozen. Re-deriving the rule set every round re-anchors the judgment and manufactures "new" findings.
 
 ---
 
@@ -25,19 +34,34 @@ Every test (and the suite as a whole) is judged across these five dimensions:
 | **4. Risk-Aligned Necessity**<br>*(风险对齐的必要性)* | **Does the suite target domain invariants, security boundaries, destructive mutations, and feature interactions rather than repeating nominal happy paths?** One test per equivalence class. | **Happy-Path Bloat (正常路径堆砌)**: Dozens of tests for nominal inputs while auth/tenant isolation, path/symlink traversal, partial failure recovery, idempotency, and combined options (`A + B`) have zero tests. |
 | **5. Diagnostic Signal-to-Noise**<br>*(诊断信噪比与维护成本)* | **Is the test deterministic, fast, and immediately clear about which business invariant broke when it fails?** | **Brittle / Noisy Megatest**: Flaky timing/network dependencies, or giant tests with opaque setups whose maintenance cost exceeds the risk of the code under test. |
 
+### Binary Probes (decompose before judging)
+
+Do not score dimensions holistically. For each test/double/INV, tick these near-binary items in the ledger (yes / no / `UNVERIFIED`, each with an evidence pointer). Decomposed binary criteria measurably stabilize judgment (inter-evaluator agreement α 0.09 → 0.48–0.67, CheckEval; concreteness gradient, AlAmir 2026).
+
+- **D1 (per test):** (a) expected values are hand-worked literals from the spec, not recomputed or copy-pasted; (b) assertions verify observable state/side effects, not only a return-ok flag; (c) you can name one concrete mutation (`file:line`) this test would catch.
+- **D2 (per double):** (a) the double sits at an external system boundary, not an internal collaborator; (b) the fake rejects at least one input the real dependency rejects, verified against schema/OpenAPI/SDK types, real binary `--help`, or live E2E — else mark `UNVERIFIED`; (c) no permissive catch-all fallback for unknown inputs/flags.
+- **D3 (per test):** (a) observed only through public seams; (b) no private-method or internal-collaborator call-order assertions; (c) no static prose/template regex that breaks on harmless edits.
+- **D4 (per INV):** (a) every frozen INV has ≥1 covering case; (b) destructive/safety gates have negative tests; (c) known `A + B` interactions on the frozen list are covered.
+- **D5 (per test):** (a) no wall-clock/real-network dependence; (b) the failure message identifies the broken business rule; (c) setup cost is proportionate to the invariant checked.
+
 ---
 
 ## Evaluation Workflow
 
-Review only by default: **never leave persistent edits in production or test files** unless the user explicitly asks to apply fixes.
+Review only by default: **never leave persistent edits in production or test files** unless the user explicitly asks to apply fixes. The ledger and audit log live inside the git dir, so `git status` stays clean and this promise holds.
 
-### Step 0: Scope Routing & Scale Guard
+### Step 0: Scope Routing, Ledger & Round Detection
 
-1. **Resolve Scope**:
+1. **Resolve Scope** (unchanged behavior):
    - Explicit files, directories, or commands specified by the user.
    - Otherwise, current uncommitted or branch changes (`git status -sb`, `git diff --stat`).
    - If neither exists, ask one concise question to pin the target module or test file instead of scanning the entire repository.
-2. **Sub-Agent Sharding & Large-Suite Pruning Funnel**:
+2. **Ledger Resolution** (`<git-dir>/test-review/<scope-id>.md`, where `<scope-id>` is a stable slug of the scope paths):
+   - **Ledger exists → this is round N+1.** Load the frozen INV checklist and findings `F-#`. Never re-derive or renumber. This round's job: verify fixed items (with evidence), re-check the frozen checklist, open new findings only against it. New invariants may be added only as explicit `INV-D#` deltas with a justification line.
+   - **No ledger → round 1.** Create it in Step 1 and freeze IDs at the end of the round.
+   - Ledger content: `INV-#` items (each with D-probe status + evidence pointer), findings `F-#` {severity, stream: 缺陷流/意见流, status: open / fixed-verified / wontfix-escalated, stability note}, round counter, remaining budget.
+3. **Budget Check:** default 2 deep rounds + 1 verification round. If the budget is spent, emit the final report with all unresolved items marked `⚠️ 待人工复核` (assume-your-recommendation is NOT allowed for defect-stream items) and stop — do not start another deep round.
+4. **Sub-Agent Sharding & Large-Suite Pruning Funnel** (unchanged):
    - If the target scope exceeds ~300 lines of test code or ~20 test cases across multiple modules, split by module/feature and run parallel read-only sub-agents so single-context attention does not degrade into rubber-stamping `KEEP`.
    - For large legacy suites, run a fast **Pre-Screen Funnel** first (`grep` / scan) to pinpoint the 4 high-suspect categories before deep reading: (a) tests named `legacy` / `old` / `compat` / `v1` / `deprecated`, (b) adjacent micro-tests repeating heavy setup (`spawnSync`, DB/tempdir creation) for single-branch checks, (c) tests where mock setup lines exceed state assertions, and (d) static prose regex or snapshot-only tests.
 
@@ -49,12 +73,12 @@ Do **not** read `.test.*` / `.spec.*` files first—reading tests first anchors 
    - In diff mode, inspect production diffs excluding tests first (`git diff -- . ':!*test*' ':!*spec*'`).
    - If the user passed a test file directly, locate and read its corresponding production module, `GLOSSARY.md`, and relevant specs/ADRs before reading the test assertions.
 2. **List Public Seams**: Public functions/classes, HTTP/RPC endpoints, CLI argv/exit/stdout, persisted filesystem/DB state, and external API calls.
-3. **Number Must-Hold Invariants (`INV-1`, `INV-2`, …)**:
+3. **Number Must-Hold Invariants (`INV-1`, `INV-2`, …)** — round 1 writes them to the ledger and **freezes the numbering**; later rounds only append justified `INV-D#` deltas:
    - **Safety & Security Guards**: Authn/authz, tenant/organization isolation, path traversal / symlink escapes (`realpath`), destructive action gates (`--apply`, `--production`).
    - **State & Lifecycle Transitions**: Empty vs partial failure/retry vs existing state (idempotency, deduplication, stale cleanup, rollback).
    - **Feature Interactions**: Combined flags or configuration modes (`A + B`) that interact non-trivially.
    - **External Contract Boundaries**: Third-party API schemas, DB constraints, subprocess CLI flags, serialization formats.
-4. **Negative Calibration (No Fault-Invention)**: Do not demand tests for guarantees already enforced by the compiler/type system, static schema validators, or branchless pass-through glue.
+4. **Negative Calibration (No Fault-Invention)**: Do not demand tests for guarantees already enforced by the compiler/type system, static schema validators, or branchless pass-through glue. Do not add INV deltas for speculative scenarios nobody can trace to a real entrypoint.
 
 ### Step 2: Run Mutation Probes (Mental First, Targeted Atomic Physical When Ambiguous) & Audit Boundaries
 
@@ -64,21 +88,37 @@ Do **not** read `.test.*` / `.spec.*` files first—reading tests first anchors 
    - **Escalation — Targeted Atomic Physical Probe (Max 1–3 Ambiguous `P0`/`P1` Sites)**: When indirect multi-layer calls, complex regexes, or boundary math make static tracing uncertain, verify via a physical probe **only if the working tree has no uncommitted changes (`git status --porcelain` is empty)**. If uncommitted edits exist, stay strictly in Mental Probe mode and **explicitly inform the user in the report why physical mutation was skipped** (e.g., working tree has uncommitted changes—commit or stash first to enable physical mutation probes). When clean:
      1. **Write-Ahead Audit Log (`$(git rev-parse --git-dir)/test-review-mutations.jsonl`)**: Before modifying any file on disk, append a JSON line recording `{ timestamp, status: "MUTATING", file, line, originalSnippet, mutatedSnippet, testCommand }` inside the repo's git dir (so it persists for forensics without polluting `git status`).
      2. **Atomic Probe & Restore**: Run `try { mutate 1 line; run focused test via -t/--test-name-pattern; } finally { restore exact original bytes; verify git diff is empty; append status: "RESTORED" and testExitCode to the audit log }`.
-3. **Audit Test Doubles Against Grounded Contract Evidence**:
+3. **P0/P1 Oracle Rule**: A finding may be classified `P0`/`P1` only if it was physically probed, executed, or is statically decidable beyond reasonable doubt. Everything else is labeled `H`(hypothesis): report it, but **hypotheses are excluded from convergence counting**. When the working tree is dirty and physical probes were skipped, defect claims that rested on them are hypotheses by definition — say so.
+4. **Borderline Severity Vote**: When a finding sits on the P0/P1 vs P2 boundary, collect 3 independent sub-agent verdicts (fresh context each) and take the majority. Single holistic severity calls flip on near-ties.
+5. **Audit Test Doubles Against Grounded Contract Evidence**:
    - Verify mocks/fakes sit only at external boundaries, never internal collaborators.
    - Check fake input validation and fallback behavior against primary sources in order: (a) repo schemas / OpenAPI / SDK types, (b) real binary/CLI `--help` output, (c) live E2E assertions. Flag permissive catch-all fallbacks (e.g., returning `200 OK` or `{ id: "fake-id" }` for unknown subcommands/flags). If the real contract cannot be verified locally, mark it `UNVERIFIED`—never guess.
-4. **Audit E2E & Integration Execution Status**:
+6. **Audit E2E & Integration Execution Status**:
    - Distinguish **Offline Seam Verification** (run against fakes/in-memory doubles) from **Live Contract Verification** (executed against a real dependency). Explicitly flag tests gated by unset environment variables (`skip`) as unexecuted in the current run.
 
-### Step 3: Probe Production Code at Untested Boundaries
+### Step 3: Probe Production Code at Untested Boundaries (bounded by the frozen checklist)
 
-For every `INV-*` boundary or option combination left uncovered in Step 2, **trace the production code path line-by-line**. Untested boundaries frequently conceal real implementation bugs.
+For every frozen `INV-*` boundary or option combination left uncovered in Step 2, **trace the production code path line-by-line**. Untested boundaries frequently conceal real implementation bugs. Scope guard: chase only frozen INVs and justified deltas — do not re-expand the boundary universe each round.
 
 ### Step 4: Classify Actionable Verdicts & Prune Low-Value Tests (宁缺毋滥)
 
-1. **Zero Marginal Value Rule (零边际价值即淘汰)**: For every existing test, ask: *"If we delete this test today, what realistic business bug could slip through that is not already caught by the type system or an upper-level integration test?"* If the answer is "none", **never mark it `KEEP`**—classify as **`DELETE` (`删除冗余`)** or **`MERGE` (`合并重复`, fold $N$ fragmented setup-heavy tests into $1$)**.
-2. **Dead-Code Symbiosis Check (测试与生产死代码共生识别)**: When a test exercises a legacy or compatibility branch, check whether any real production entrypoint or current domain spec (`GLOSSARY.md` / `ADR`) still uses that branch. If the test is the only caller keeping obsolete production code alive, classify as **`DELETE TEST + DEAD CODE` (`连同生产死代码下线`)**.
-3. **Missing Boundaries**: Classify each uncovered high-risk scenario as **`MUST-ADD (Offline Seam)` (`新增用例（本地）`)** or **`MUST-ADD (Live E2E / Contract)` (`新增用例（真实环境）`)**.
+1. **Sort every finding into one of two streams**:
+   - **缺陷流 (defect stream — gates convergence)**: `P0` (missed real bug or high-risk security/data-corruption guard), `P1` (mock diverges from real interface, unexecuted E2E, missed critical state transition), `P2` (weak assertion that cannot fail meaningfully, missing negative check).
+   - **意见流 (opinion stream — recorded, never blocking)**: `P3` implementation coupling, duplicate/fragmented tests, merge suggestions, zero-marginal-value deletions, style of test naming/setup.
+2. **Zero Marginal Value Rule (零边际价值即淘汰)**: For every existing test, ask: *"If we delete this test today, what realistic business bug could slip through that is not already caught by the type system or an upper-level integration test?"* If "none", classify **`DELETE (删除冗余)`** or **`MERGE (合并重复)`** — into the opinion stream.
+3. **Dead-Code Symbiosis Check (测试与生产死代码共生识别)**: When a test exercises a legacy/compat branch, check whether any real production entrypoint or current spec (`GLOSSARY.md` / `ADR`) still uses that branch. If the test is the only caller keeping obsolete production code alive, classify **`DELETE TEST + DEAD CODE (连同生产死代码下线)`** — opinion stream unless the dead branch is itself a P0/P1 hazard.
+4. **Verdict Stickiness (首轮裁决粘滞)**: KEEP/DELETE/MERGE are counterfactual near-tie judgments that flip under re-judging. A round-1 verdict stands unless overturned by **new oracle evidence** (physical probe, contract source, execution) — not by re-opinion. Genuinely contested cases go to the user in **one batched escalation round** (list them all, with your recommendation each, like a grilling must-ask list); do not re-litigate them silently every round.
+5. **Missing Boundaries**: Classify each uncovered frozen INV as **`MUST-ADD (Offline Seam) (新增用例（本地）)`** or **`MUST-ADD (Live E2E / Contract) (新增用例（真实环境）)`** — defect stream.
+
+### Convergence Definition (the stop condition)
+
+The review **converges at round N** if and only if:
+
+1. Every ledger defect-stream finding is `fixed-verified` (fix observed and evidenced) or `wontfix-escalated` (user decided);
+2. Re-checking the frozen INV checklist and D-probes yields **zero new P0/P1**;
+3. Everything still open is opinion-stream or an `H` hypothesis.
+
+When converged, state: “收敛于第 N 轮：冻结清单无新增 P0/P1。这不等于‘没有更多问题’——完备测试判据不存在(Howden 1976);继续投入属于新的风险预算决策。”
 
 ---
 
@@ -86,25 +126,32 @@ For every `INV-*` boundary or option combination left uncovered in Step 2, **tra
 
 Write in **plain, direct engineering language** (in the user's language).
 - **Ban literal translationese & academic jargon**: Never output terms like "公共接缝 (Seam)", "核心不变量 (Invariant)", "变异体存活 / 杀死变异体", or "Offline Seam Coverage". Say "对外入口", "核心业务规则", "删掉这行代码测试依然通过", and "本地离线测试 vs 真实环境测试".
-- **Self-contained tags over lookup IDs**: In findings, use direct tags (`[漏测边界]`, `[弱断言]`, `[Mock 失真]`, `[绑定内部实现]`, `[历史僵尸/死代码]`, `[重复碎片]`) instead of forcing the reader to look up `(违反维度 4，关联 INV-2)`.
+- **Self-contained tags over lookup IDs**: In findings, use direct tags (`[漏测边界]`, `[弱断言]`, `[Mock 失真]`, `[绑定内部实现]`, `[历史僵尸/死代码]`, `[重复碎片]`, `[待实证假设]`) instead of forcing the reader to look up `(违反维度 4，关联 INV-2)`.
 - **Consequence first, code second**: Lead every finding with what breaks in plain language before citing function names or line numbers.
 
 Unless the user asks to modify files, output the review using this structure:
 
-1. **`核心业务规则与高危边界`**
-   - Concise bullet list of public entrypoints ("对外入口": CLI/API/functions) and the must-hold business rules (`INV-1 … INV-N`).
-2. **`总体结论与测试运行概况`**
-   - **结论**：`高信噪比` / `存在局部盲区` / `存在明显虚假安全感` (if high-signal, state `高信噪比` directly without padding).
+1. **`收敛状态`** (first, always):
+   - 轮次 / 剩余预算；台账路径 `<git-dir>/test-review/<scope-id>.md`；
+   - 已关闭缺陷流项数（fixed-verified / wontfix-escalated）；本轮新增 P0/P1 数；
+   - `H` 假设清单（及为何未能实证）；`⚠️ 待人工复核` 清单（预算耗尽或近平局升级项）；
+   - 是否收敛（按上述定义），或距收敛还差什么。
+2. **`核心业务规则与高危边界`**
+   - Concise bullet list of public entrypoints ("对外入口": CLI/API/functions) and the must-hold business rules (`INV-1 … INV-N`, frozen; list any `INV-D#` deltas with justification).
+3. **`总体结论与测试运行概况`**
+   - **结论**：`高信噪比` / `存在局部盲区` / `存在明显虚假安全感` (if high-signal, state `高信噪比` directly without padding). This label is a human-readable summary only — the stop condition is `收敛状态`, not this label.
    - **运行与验证概况**：
      - 实跑结果（通过数 / 跳过数）；
-     - 变异实证情况（说明对哪些代码做了物理删改验证，并附上取证日志路径 `<git-dir>/test-review-mutations.jsonl`；若未做物理变异，必须写明原因：如“工作区存在未提交改动，为防冲突仅做静态推演，如需物理验证请先 commit/stash”或“静态推演已全部确认”）；
+     - 变异实证情况（说明对哪些代码做了物理删改验证，并附上取证日志路径 `<git-dir>/test-review-mutations.jsonl`；若未做物理变异，必须写明原因：如“工作区存在未提交改动，为防冲突仅做静态推演，相关缺陷项已降级为 H 假设；如需实证请先 commit/stash”或“静态推演已全部确认”）；
      - 真实环境覆盖（区分哪些走了真实外部依赖，哪些只测了本地假对象/Mock，以及未核实的外部契约 `UNVERIFIED`）。
-3. **`重点问题诊断（按 P0–P3 排序）`**
-   - Severity: `P0` (漏掉真实 Bug 或高危安全/数据损坏守卫), `P1` (Mock 与真实接口不符、未跑真实 E2E 或关键状态流转漏测), `P2` (断言过弱只测不报错，或缺少负向校验), `P3` (绑定内部实现或重复用例).
+4. **`重点问题诊断（按 P0–P3 排序）`**
+   - Severity: `P0` (漏掉真实 Bug 或高危安全/数据损坏守卫—须实证), `P1` (Mock 与真实接口不符、未跑真实 E2E 或关键状态流转漏测), `P2` (断言过弱只测不报错，或缺少负向校验), `P3` (绑定内部实现或重复用例—意见流). Items lacking oracle evidence carry the `[待实证假设]` tag and are excluded from convergence.
    - Format each item as 3 short lines (no dense walls of text):
      - **`P0/P1/P2/P3` `[分类标签]` 一句话大白话讲清什么场景下会出什么问题**（标题不堆砌函数名和行号）
      - **出问题场景**：用户或系统怎么操作会触发这个问题，实际后果是什么。
      - **为什么测试没拦住**：指向具体代码行（`file:line`）和测试行（`test:line`），说明哪段逻辑没测到，或实测删掉某行代码后测试为什么依然全绿。
      - **怎么改**：一句话给出补测试或修代码的具体动作。
-4. **`测试用例修改清单`**
-   - Table of **actionable items only** using plain verbs (**`补强断言`** / **`合并重复`** / **`删除冗余`** / **`连同生产死代码下线`** / **`新增用例（本地）`** / **`新增用例（真实环境）`**). Summarize untouched good tests as a single count per file (e.g., `其余 8 个用例覆盖有效，保持不变`).
+5. **`测试用例修改清单`** — two tables:
+   - **缺陷流（阻塞收敛）**: actionable items only, verbs **`补强断言`** / **`新增用例（本地）`** / **`新增用例（真实环境）`**; each maps to a ledger `F-#`.
+   - **意见流（不阻塞收敛）**: **`合并重复`** / **`删除冗余`** / **`连同生产死代码下线`** 等, each with its round-1 sticky verdict; contested ones point to the escalation list in `收敛状态`.
+   - Summarize untouched good tests as a single count per file (e.g., `其余 8 个用例覆盖有效，保持不变`).
